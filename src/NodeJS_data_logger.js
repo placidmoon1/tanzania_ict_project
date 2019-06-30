@@ -24,6 +24,14 @@ const SerialPort = require('serialport');
 
 const baudRate = 115200;
 
+const ResultCode = {
+  SUCCESS: "0",
+  ERR_INVALID_VOUCHER_NUM: "1", 
+  ERR_USED_VOUCHER_NUM: "2",
+  ERR_INVALID_CHANNEL_OR_BUILDING_NUM: "3",
+  ERR_UNDEFINED: "9",
+};
+
 let port = null;
 
 SerialPort.list((err, ports) => {
@@ -158,8 +166,8 @@ function checkVoucherValidity(userInput) {
   const sql = 'SELECT `isUsed` FROM `Voucher` WHERE `voucherNum` = (?) '
   con.query(sql, [userInput[2]], function (err, result, fields) {
     if (err) {
-      console.log("Error occurred");
-      return false;
+      console.log("SELECT `isUsed` FROM `Voucher` WHERE `voucherNum` = (?) failed");
+      return writeToSerial(ResultCode.ERR_UNDEFINED);
     } 
     while (true) {
       if (typeof result !== undefined) {
@@ -167,43 +175,35 @@ function checkVoucherValidity(userInput) {
       }
     }
     console.log(result);
+    if (result.length == 0) {
+      console.log("Voucher num doesn't exist");
+      return writeToSerial(ResultCode.ERR_INVALID_VOUCHER_NUM);
+    }
     if (result[0].isUsed == 1) {
       console.log("Already Used");
-      return false;
-    } else { // if not used 
-      changeVoucherIsUsed(userInput)
+      return writeToSerial("2");   
+     } else { // if not used 
+      getVoucherValue(ResultCode.ERR_USED_VOUCHER_NUM);
     }
   });
 }
 
-/**
- * Change the isUsed status of the voucher of the current user (from 0 -> 1)
- * @param {*} userInput 
- */
-function changeVoucherIsUsed(userInput) {
-  console.log("changing isUsed status of voucher number of " + userInput);
-  const sql = 'UPDATE `Voucher` SET `isUsed` = 1 WHERE `voucherNum` = (?);';
-  con.query(sql, [userInput[2]], function (err, result, fields){
-    if (err) {
-      console.log("Error occurred in changing isUsed field of voucher " + userInput[2]);
-      return false;
-    } else {
-      return getVoucherValue(userInput);
-    }
-  });
-}
+
 
 /**
  * Get the voucher value assoicated with the voucher number
- * @param {*} userInput 
+ * @param {Array[Int, Int, Int]} userInput Array of parsed user Input
+ * userInput index 0: channelNum
+ * userInput index 1: buildingNum
+ * userInput index 2: voucherNum
  */
 function getVoucherValue(userInput){
   console.log("getting voucher value" + userInput);
   const sql = 'SELECT `voucherValue` FROM `voucher` WHERE `voucherNum` = (?);';
   con.query(sql, [userInput[2]], function (err, result, fields){
     if (err) {
-      console.log("Error occurred in changing isUsed field of voucher " + userInput[2]);
-      return false;
+      console.log("Error occurred in selecting voucherValue field of voucher " + userInput[2]);
+      return writeToSerial(ResultCode.ERR_UNDEFINED);
     } else {
       userInputWithVV = [userInput[0], userInput[1], userInput[2], result[0].voucherValue];
       return getCorrespondingCredit(userInputWithVV);
@@ -211,60 +211,133 @@ function getVoucherValue(userInput){
   });
 }
 
+/**
+ * Get corresponding credit value associated with the voucher value
+ * @param {Array[Int, Int, Int, Int]} userInput Array of parsed user Input + voucher value
+ * userInput index 0: channelNum
+ * userInput index 1: buildingNum
+ * userInput index 2: voucherNum
+ * userInput index 3: voucherValue
+ */
 function getCorrespondingCredit(userInput){
   console.log("getting voucher value to kw credit " + userInput);
   const sql = 'SELECT `credit` FROM `moneyToKW` WHERE `money` = (?);';
   con.query(sql, [userInput[3]], function (err, result, fields){
     if (err) {
-      console.log("Error occurred in changing isUsed field of voucher " + userInput[2]);
-      return false;
+      console.log("error occur in selecting credit equivalent of money in moneyToKw" + userInput[2]);
+      return writeToSerial(ResultCode.ERR_UNDEFINED);
     } else {
       console.log(result);
       userInputWithVVAndCredit = [userInput[0], userInput[1], userInput[2], userInput[3], result[0].credit];
-      return insertValueIntoRawHistoryData(userInputWithVVAndCredit);
+      return updateUserData(userInputWithVVAndCredit);
     }
   });
 }
 
-
-function insertValueIntoRawHistoryData(userInput) {
-  console.log("inserting " + userInput + " to RawHistoryData");
-  const sql = 'INSERT INTO `RawHistoryData` (`channel`, `building`, `voucherNum`, `creditVal`) VALUES (?, ?, ?, ?);';
-  con.query(sql, [userInput[0], userInput[1], userInput[2], userInput[4]], function (err, result) {
-      if (err) {
-        console.log("Error occurred in inserting value into RawHistoryData " + err);
-        return false;
-      } else {
-        return updateUserData(userInput);
-      }
-  });
-}
-
+/**
+ * Update user data with the corresponding credit value 
+ * @param {Array[Int, Int, Int, Int]} userInput Array of parsed user Input + voucher value + corresponding credit value
+ * userInput index 0: channelNum
+ * userInput index 1: buildingNum
+ * userInput index 2: voucherNum
+ * userInput index 3: voucherValue 
+ * userInput index 4: creditValue
+ */
 function updateUserData(userInput) {
   console.log("updating " + userInput + " to UserData");
   const sql = 'UPDATE `UserData` SET `credit` = `credit` + (?) WHERE `channel` = (?) AND `building` = (?);';
   con.query(sql, [userInput[4], userInput[0], userInput[1]], function (err, result) {
     if (err) {
       console.log("Error occurred in updating value into UserData");
-      return false;
+      return writeToSerial(ResultCode.ERR_UNDEFINED);
     } else {
-      return true;
+      console.log(result);
+      if (result.affectedRows == 0) {
+        console.log("Error occurred in updating value into updateUserData " + userInput);
+        return writeToSerial(ResultCode.ERR_INVALID_CHANNEL_OR_BUILDING_NUM);
+      }
+      return insertValueIntoRawHistoryData(userInput);
     }
   });
 }
+
+/**
+ * Insert new user input + credit value associated with the transaction
+ * into RawHistoryData table
+ * @param {Array[Int, Int, Int, Int]} userInput Array of parsed user Input + voucher value + corresponding credit value
+ * userInput index 0: channelNum
+ * userInput index 1: buildingNum
+ * userInput index 2: voucherNum
+ * userInput index 3: voucherValue 
+ * userInput index 4: creditValue
+ */
+function insertValueIntoRawHistoryData(userInput) {
+  console.log("inserting " + userInput + " to RawHistoryData");
+  const sql = 'INSERT INTO `RawHistoryData` (`channel`, `building`, `voucherNum`, `creditVal`) VALUES (?, ?, ?, ?);';
+  con.query(sql, [userInput[0], userInput[1], userInput[2], userInput[4]], function (err, result) {
+      if (err) {
+        console.log("Error occurred in inserting into rawhistorydata " + err);
+        return writeToSerial(ResultCode.ERR_UNDEFINED);
+      } else {
+        changeVoucherIsUsed(userInput);
+      }
+  });
+}
+
+/**
+ * Change the isUsed status of the voucher of the current user (from 0 -> 1)
+ * in the Voucher table
+ * @param {Array[Int, Int, Int, Int]} userInput Array of parsed user Input + voucher value + corresponding credit value
+ * userInput index 0: channelNum
+ * userInput index 1: buildingNum
+ * userInput index 2: voucherNum
+ * userInput index 3: voucherValue 
+ * userInput index 4: creditValue
+ */
+function changeVoucherIsUsed(userInput) {
+  console.log("changing isUsed status of voucher number of " + userInput);
+  const sql = 'UPDATE `Voucher` SET `isUsed` = 1 WHERE `voucherNum` = (?);';
+  con.query(sql, [userInput[2]], function (err, result, fields){
+    if (err) {
+      console.log("Error occurred in changing isUsed field of voucher " + userInput[2]);
+      return writeToSerial(ResultCode.ERR_UNDEFINED);
+    } else {
+      return writeToSerial(ResultCode.SUCCESS);
+    }
+  });
+}
+
+/**
+ * Write the resultCode value to Arduino via Serial communication
+ * @param {ResultCode} resultCode One of the resultCodes defined in the resultCode enum
+ */
+function writeToSerial(resultCode){
+  port.write(resultCode + "\n", 
+    (err) => {
+      if (err) {
+        return console.log("Error on write : ", err.message);
+      }
+      console.log('message writen with resultCode: ' + resultCode);
+    }
+  );
+}
+
 
 //TODO: create dummy cases
 function test(){
 
 }
 
-//TODO: create update function of moneytokw 
-function updateMoneyToKw(){
-
+//create update function of moneytokw 
+function updateMoneyToKw(moneyVal, creditVal){
+  console.log("updating " + moneyVal + " to " + creditVal);
+  const sql = 'UPDATE `MoneyToKw` SET `credit` = (?)  WHERE `money` = (?);';
+  con.query(sql, [moneyVal, creditVal], function (err, result) {
+    if (err) {
+      console.log("Error occurred in updating moneytokw table");
+    } else {
+      return true;
+    }
+  });
 }
 
-//TODO: create write function to serail
-function writeToSerial(){
-  port.write
-  
-}
