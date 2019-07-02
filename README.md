@@ -11,6 +11,10 @@ Hello, world
   - Keypad
   - LCD Shield 
   - 
+- Hardware Connection:
+  1. f
+  2. ff
+  3. xx
 ### Folder
 Create a folder in your drive to store the project. 
 
