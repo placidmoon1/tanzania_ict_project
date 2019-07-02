@@ -64,8 +64,9 @@ On start:
 2. Type `localhost` in your main browser 
 3. Go to Tools > `phpmyadmin` 
 4. Login to `phpmyadmin` through the default username and password (`root`, [Nothing]) 
-5. **(Only on first start)** _Copy the SQL_Arduino code and paste it in the SQL tab and click go_
+5. **(Only on first start)** _Copy the `SQL_Arduino` code and paste it in the SQL tab and click go_
 6. Connect the `Arduino` with the computer usb port
+7. **(Only on first start)** _Upload the `Arduino_Code` file to the Arduino Mega using the `Arduino` IDE_
 7. Open the `cmd` and `cd` to the folder that you created
 8. Use the command `node NodeJS_data_logger` to turn on the `NodeJS` server
 
