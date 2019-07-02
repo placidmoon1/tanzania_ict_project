@@ -40,6 +40,9 @@ const con = MySQL.createConnection({
 ### PHP Server
 - Download and install WAMP server version 3.1.9 or higher from [sourceforge](https://sourceforge.net/projects/wampserver/)
 
+## Database Structure
+
+
 ## Using the system
 
 ### Valid form of input
