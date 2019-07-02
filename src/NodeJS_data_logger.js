@@ -183,7 +183,7 @@ function checkVoucherValidity(userInput) {
       console.log("Already Used");
       return writeToSerial("2");   
      } else { // if not used 
-      getVoucherValue(ResultCode.ERR_USED_VOUCHER_NUM);
+      getVoucherValue(userInput);
     }
   });
 }
