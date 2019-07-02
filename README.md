@@ -48,6 +48,10 @@ where:
 - `channelNum` is a one digit integer
 - `buildingNum` is a two digit integer
 - `voucherNum` is a ten digit integer
+
+Example: 
+\*111\*0123456789\* is valid.
+
 ### Process of the system
 On start: 
 1. Turn on the `WAMP` server. 
