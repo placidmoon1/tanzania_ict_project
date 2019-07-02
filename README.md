@@ -76,7 +76,7 @@ On start:
 
 Continuously: 
 1. User inputs a potentially valid input via Arduino keypad
-2. The input would be parsed, and queried appropriately.
+2. When the key `D` is clicked, user input would be blocked and the previous entered input would be parsed, queried appropriately, and a value would be returned. 
 3. The return value would be a `processCode`, which would be displayed in the Arduino LCD screen.
 
 ### LCD Display & `processCode`s
