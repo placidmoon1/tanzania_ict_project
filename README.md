@@ -50,7 +50,10 @@ where:
 - `voucherNum` is a ten digit integer
 
 Example: 
-\*111\*0123456789\* is valid.
+\*111\*0123456789\* is valid and this is parsed into 
+- `channelNum` == 1
+- `buildingNum` == 11
+- `voucherNum` == 0123456789
 
 ### Process of the system
 On start: 
