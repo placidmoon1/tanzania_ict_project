@@ -43,7 +43,11 @@ const con = MySQL.createConnection({
 ## Using the system
 
 ### Valid form of input
-*[1|2]
+\*\[`channelNum`\]\[`buildingNum`\]\*\[`voucherNum`\]\*
+where: 
+- `channelNum` is a one digit integer
+- `buildingNum` is a two digit integer
+- `voucherNum` is a ten digit integer
 ### Process of the system
 On start: 
 1. Turn on the `WAMP` server. 
