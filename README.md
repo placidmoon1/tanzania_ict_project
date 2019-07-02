@@ -10,7 +10,7 @@ Hello, world
   - USB cable (Arduino to USB)
   - Keypad
   - LCD Shield 
-  - 
+  - 8 M-F Jumper wires 
 - Hardware Connection:
   1. f
   2. ff
