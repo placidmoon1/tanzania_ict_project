@@ -66,4 +66,11 @@ BEGIN
 END $$
 DELIMITER $$
 
+DROP PROCEDURE IF EXISTS create_voucher; 
+DELIMITER $$
+CREATE PROCEDURE `create_voucher`(IN `userDesiredVValue` INT(5))
+    NO SQL
+INSERT INTO `Voucher` (`voucherNum`, `voucherValue`, `isUsed`) VALUES	(FLOOR(RAND()*1000000000), `userDesiredVValue`, 0 )$$
+DELIMITER ;
+
 CALL create_user_data();
