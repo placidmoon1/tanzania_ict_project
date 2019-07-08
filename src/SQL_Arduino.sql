@@ -24,6 +24,7 @@ CREATE TABLE IF NOT EXISTS `RawHistoryData` (
   `channel` int(1) ZEROFILL NOT NULL,
   `building` int(2) ZEROFILL NOT NULL,
   `voucherNum` bigint(10) ZEROFILL NOT NULL,
+  `voucherValue` int(6) ZEROFILL NOT NULL,
   `creditVal` int(6) ZEROFILL NOT NULL
 ) ENGINE = InnoDB 
   DEFAULT CHARSET = utf8mb4
@@ -68,9 +69,17 @@ DELIMITER $$
 
 DROP PROCEDURE IF EXISTS create_voucher; 
 DELIMITER $$
-CREATE PROCEDURE `create_voucher`(IN `userDesiredVValue` INT(5))
+CREATE PROCEDURE `create_voucher`(IN `userDesiredVValue` INT(5), IN `quantity` INT(3))
     MODIFIES SQL DATA
-INSERT INTO `Voucher` (`voucherNum`, `voucherValue`, `isUsed`) VALUES	(FLOOR(RAND()*1000000000), `userDesiredVValue`, 0 )$$
+BEGIN
+	DECLARE i INT;
+    SET i = 1;
+    WHILE i <= `quantity` DO
+      INSERT INTO `Voucher` (`voucherNum`, `voucherValue`, `isUsed`) VALUES	(FLOOR(RAND()*10000000000), `userDesiredVValue`, 0 );
+      SET i = i + 1;
+    END WHILE;
+ END$$
 DELIMITER ;
+
 
 CALL create_user_data();
