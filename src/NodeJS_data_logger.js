@@ -273,7 +273,7 @@ function updateUserData(userInput) {
  */
 function insertValueIntoRawHistoryData(userInput) {
   console.log("inserting " + userInput + " to RawHistoryData");
-  const sql = 'INSERT INTO `RawHistoryData` (`channel`, `building`, `voucherNum`, `voucherValue`, creditVal`) VALUES (?, ?, ?, ?);';
+  const sql = 'INSERT INTO `RawHistoryData` (`channel`, `building`, `voucherNum`, `voucherValue`, creditVal`) VALUES (?, ?, ?, ?, ?);';
   con.query(sql, [userInput[0], userInput[1], userInput[2], userInput[3], userInput[4]], function (err, result) {
       if (err) {
         console.log("Error occurred in inserting into rawhistorydata " + err);
