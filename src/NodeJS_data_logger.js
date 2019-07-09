@@ -24,15 +24,9 @@ const SerialPort = require('serialport');
 
 const baudRate = 115200;
 
-const ResultCode = {
-  SUCCESS: "0",
-  ERR_INVALID_VOUCHER_NUM: "1", 
-  ERR_USED_VOUCHER_NUM: "2",
-  ERR_INVALID_CHANNEL_OR_BUILDING_NUM: "3",
-  ERR_UNDEFINED: "9",
-};
-
-let port = null;
+let port_keypad = null;
+let port_channel1 = null;
+let port_channel2 = null;
 
 SerialPort.list((err, ports) => {
     if (err)
@@ -41,35 +35,81 @@ SerialPort.list((err, ports) => {
         console.error("No Serial ports found");
 
     // Iterate over all the serial ports, and look for an Arduino
-    let comName = null;
+    let comName_keypad = null;
+    let comName_channel1 = null;
+    let comName_channel2 = null;
+    let result = 0;
     ports.some((port) => {
-        if (port.manufacturer
-            && port.manufacturer.match(/Arduino/)) {
-            comName = port.comName;
-            console.log('Found Arduino');
+      if (port.pnpId
+          && port.pnpId.match(/USB\\VID_2341\&PID_0042\\55834323933351403140/)) { // Arduino Mega "hard coding"
+            comName_keypad = port.comName;
+            console.log('Found Arduino Mega: the Keypad');
             console.log('\t' + port.comName);
             console.log('\t\t' + port.pnpId);
             console.log('\t\t' + port.manufacturer);
-            return true;
-        }
+            result += 1;
+            if (result == 3) {
+              return true;
+            }
+          }
+        if (port.pnpId
+          && port.pnpId.match(/USB\\VID_2341\&PID_804E\&MI_00\\6\&56FCEDF\&0\&0000/)) { // Arduino MKR Channel 1 "hard coding"
+            comName_channel1 = port.comName;
+            console.log('Found Arduino Channel 1');
+            console.log('\t' + port.comName);
+            console.log('\t\t' + port.pnpId);
+            console.log('\t\t' + port.manufacturer);
+            result += 1;
+            if (result == 3) {
+              return true;
+            }
+          }
+        if (port.pnpId
+          && port.pnpId.match(/USB\\VID_2341\&PID_804E\&MI_00\\6\&56FCEDF\&0\&0000/)) { // Arduino Channel 2 "hard coding"
+            comName_channel2 = port.comName;
+            console.log('Found Arduino Channel 2');
+            console.log('\t' + port.comName);
+            console.log('\t\t' + port.pnpId);
+            console.log('\t\t' + port.manufacturer);
+            result += 1;
+            if (result == 3) {
+              return true;
+            }
+          }
         return false;
     });
-
+    /*
     if (comName == null) {
         comName = ports[0].comName;
         console.warn('No Arduino found, selecting first COM port (' + comName + ')');
     }
+    */
 
     // Open the port
-    port = new SerialPort(comName, { baudRate: baudRate },
+    port_keypad = new SerialPort(comName_keypad, { baudRate: baudRate },
         (err) => {
             if (err)
                 console.error(err);
         });
     
     // Attach a callback function to handle incomming data
-    port.on('data', receiveSerial);
-    console.log("Connected to Arduino");
+    port_keypad.on('data', receiveKeypadSerial);
+    console.log("Connected to Keypad port");
+
+    port_channel1 = new SerialPort(comName_channel1, { baudRate: baudRate },
+      (err) => {
+          if (err)
+              console.error(err);
+      });
+    port_channel1.on('data', receiveChannel1Serial);
+
+    port_channel2 = new SerialPort(comName_channel2, {buadRate: baudRate},
+      (err) => {
+        if (err)
+            console.error(err);
+    });
+    port_channel2.on('data', receiveChannel2Serial);
+    
 });
 
 // A class for reading lines of text
@@ -104,6 +144,13 @@ class TextParser {
 
 const parser = new TextParser;
 
+const ResultCode = {
+  SUCCESS: "0",
+  ERR_INVALID_VOUCHER_NUM: "1", 
+  ERR_USED_VOUCHER_NUM: "2",
+  ERR_INVALID_CHANNEL_OR_HOUSE_NUM: "3",
+  ERR_UNDEFINED: "9",
+};
 
 /**
  * Entry function of Serial Events;
@@ -113,7 +160,7 @@ const parser = new TextParser;
  *    then change control to splitString
  * @param {byteArray (?)} dataBuf the received Buffer, 
  */
-function receiveSerial(dataBuf) {
+function receiveKeypadSerial(dataBuf) {
     let str = dataBuf;
     console.log(str.length);
     console.log(str);
@@ -134,7 +181,7 @@ function receiveSerial(dataBuf) {
 /**
  * Splits the 16 character message into
  * channelNum (1 character, integer, index 1)
- * buildingNum (2 characters, integer, index 2 ~ 3)
+ * houseNum (2 characters, integer, index 2 ~ 3)
  * voucherNum (10 characters, integer, index 5 ~ 14)
  * If parsed, change control to "checkVoucherValidity" function 
  * @param {String} message parsed complete userInput 
@@ -142,12 +189,12 @@ function receiveSerial(dataBuf) {
 function splitString(message){
   console.log("splitting string of" + message);
   channelNum = parseInt(message.substr(1, 1));
-  buildingNum = parseInt(message.substr(2, 3));
-  voucherNum = parseInt(message.substr(5, 14));
+  houseNum = parseInt(message.substr(2, 2));
+  voucherNum = parseInt(message.substr(5, 10));
   console.log(channelNum);
-  console.log(buildingNum);
+  console.log(houseNum);
   console.log(voucherNum);
-  checkVoucherValidity([channelNum, buildingNum, voucherNum]);
+  checkVoucherValidity([channelNum, houseNum, voucherNum]);
 }
 
 /**
@@ -158,15 +205,15 @@ function splitString(message){
  * 
  * @param {Array[Int, Int, Int]} userInput Array of parsed user Input
  * userInput index 0: channelNum
- * userInput index 1: buildingNum
+ * userInput index 1: houseNum
  * userInput index 2: voucherNum
  */
 function checkVoucherValidity(userInput) {
   console.log("checking voucher number of " + userInput);
-  const sql = 'SELECT `isUsed` FROM `Voucher` WHERE `voucherNum` = (?) '
+  const sql = 'SELECT `isUsed` FROM `NG_Voucher` WHERE `voucherNum` = (?) '
   con.query(sql, [userInput[2]], function (err, result, fields) {
     if (err) {
-      console.log("SELECT `isUsed` FROM `Voucher` WHERE `voucherNum` = (?) failed");
+      console.log("SELECT `isUsed` FROM `NG_Voucher` WHERE `voucherNum` = (?) failed");
       return writeToSerial(ResultCode.ERR_UNDEFINED);
     } 
     while (true) {
@@ -194,12 +241,12 @@ function checkVoucherValidity(userInput) {
  * Get the voucher value assoicated with the voucher number
  * @param {Array[Int, Int, Int]} userInput Array of parsed user Input
  * userInput index 0: channelNum
- * userInput index 1: buildingNum
+ * userInput index 1: houseNum
  * userInput index 2: voucherNum
  */
 function getVoucherValue(userInput){
   console.log("getting voucher value" + userInput);
-  const sql = 'SELECT `voucherValue` FROM `voucher` WHERE `voucherNum` = (?);';
+  const sql = 'SELECT `voucherValue` FROM `NG_voucher` WHERE `voucherNum` = (?);';
   con.query(sql, [userInput[2]], function (err, result, fields){
     if (err) {
       console.log("Error occurred in selecting voucherValue field of voucher " + userInput[2]);
@@ -215,16 +262,16 @@ function getVoucherValue(userInput){
  * Get corresponding credit value associated with the voucher value
  * @param {Array[Int, Int, Int, Int]} userInput Array of parsed user Input + voucher value
  * userInput index 0: channelNum
- * userInput index 1: buildingNum
+ * userInput index 1: houseNum
  * userInput index 2: voucherNum
  * userInput index 3: voucherValue
  */
 function getCorrespondingCredit(userInput){
   console.log("getting voucher value to kw credit " + userInput);
-  const sql = 'SELECT `credit` FROM `moneyToKW` WHERE `money` = (?);';
+  const sql = 'SELECT `credit` FROM `NG_valueToKw` WHERE `value` = (?);';
   con.query(sql, [userInput[3]], function (err, result, fields){
     if (err) {
-      console.log("error occur in selecting credit equivalent of money in moneyToKw" + userInput[2]);
+      console.log("error occur in selecting credit equivalent of credit in NG_valueToKw " + userInput[3]);
       return writeToSerial(ResultCode.ERR_UNDEFINED);
     } else {
       console.log(result);
@@ -238,23 +285,23 @@ function getCorrespondingCredit(userInput){
  * Update user data with the corresponding credit value 
  * @param {Array[Int, Int, Int, Int]} userInput Array of parsed user Input + voucher value + corresponding credit value
  * userInput index 0: channelNum
- * userInput index 1: buildingNum
+ * userInput index 1: houseNum
  * userInput index 2: voucherNum
  * userInput index 3: voucherValue 
  * userInput index 4: creditValue
  */
 function updateUserData(userInput) {
   console.log("updating " + userInput + " to UserData");
-  const sql = 'UPDATE `UserData` SET `credit` = `credit` + (?) WHERE `channel` = (?) AND `building` = (?);';
+  const sql = 'UPDATE `NG_UserData` SET `credit` = `credit` + (?) WHERE `channel` = (?) AND `houseNum` = (?);';
   con.query(sql, [userInput[4], userInput[0], userInput[1]], function (err, result) {
     if (err) {
-      console.log("Error occurred in updating value into UserData");
+      console.log("Error occurred in updating value into NG_UserData");
       return writeToSerial(ResultCode.ERR_UNDEFINED);
     } else {
       console.log(result);
       if (result.affectedRows == 0) {
-        console.log("Error occurred in updating value into updateUserData " + userInput);
-        return writeToSerial(ResultCode.ERR_INVALID_CHANNEL_OR_BUILDING_NUM);
+        console.log("Error occurred in updating value into NG_updateUserData " + userInput);
+        return writeToSerial(ResultCode.ERR_INVALID_CHANNEL_OR_HOUSE_NUM);
       }
       return insertValueIntoRawHistoryData(userInput);
     }
@@ -266,14 +313,14 @@ function updateUserData(userInput) {
  * into RawHistoryData table
  * @param {Array[Int, Int, Int, Int]} userInput Array of parsed user Input + voucher value + corresponding credit value
  * userInput index 0: channelNum
- * userInput index 1: buildingNum
+ * userInput index 1: houseNum
  * userInput index 2: voucherNum
  * userInput index 3: voucherValue 
  * userInput index 4: creditValue
  */
 function insertValueIntoRawHistoryData(userInput) {
-  console.log("inserting " + userInput + " to RawHistoryData");
-  const sql = 'INSERT INTO `RawHistoryData` (`channel`, `building`, `voucherNum`, `voucherValue`, creditVal`) VALUES (?);';
+  console.log("inserting " + userInput + " to NG_RawHistoryData");
+  const sql = 'INSERT INTO `NG_RawHistoryData` (`channel`, `houseNum`, `voucherNum`, `voucherValue`, `creditVal`) VALUES (?);';
   con.query(sql, [userInput], function (err, result) {
       if (err) {
         console.log("Error occurred in inserting into rawhistorydata " + err);
@@ -289,14 +336,14 @@ function insertValueIntoRawHistoryData(userInput) {
  * in the Voucher table
  * @param {Array[Int, Int, Int, Int]} userInput Array of parsed user Input + voucher value + corresponding credit value
  * userInput index 0: channelNum
- * userInput index 1: buildingNum
+ * userInput index 1: houseNum
  * userInput index 2: voucherNum
  * userInput index 3: voucherValue 
  * userInput index 4: creditValue
  */
 function changeVoucherIsUsed(userInput) {
   console.log("changing isUsed status of voucher number of " + userInput);
-  const sql = 'UPDATE `Voucher` SET `isUsed` = 1 WHERE `voucherNum` = (?);';
+  const sql = 'UPDATE `NG_Voucher` SET `isUsed` = 1 WHERE `voucherNum` = (?);';
   con.query(sql, [userInput[2]], function (err, result, fields){
     if (err) {
       console.log("Error occurred in changing isUsed field of voucher " + userInput[2]);
@@ -320,24 +367,5 @@ function writeToSerial(resultCode){
       console.log('message writen with resultCode: ' + resultCode);
     }
   );
-}
-
-
-//TODO: create dummy cases
-function test(){
-
-}
-
-//create update function of moneytokw 
-function updateMoneyToKw(moneyVal, creditVal){
-  console.log("updating " + moneyVal + " to " + creditVal);
-  const sql = 'UPDATE `MoneyToKw` SET `credit` = (?)  WHERE `money` = (?);';
-  con.query(sql, [moneyVal, creditVal], function (err, result) {
-    if (err) {
-      console.log("Error occurred in updating moneytokw table");
-    } else {
-      return true;
-    }
-  });
 }
 
