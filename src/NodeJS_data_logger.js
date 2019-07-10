@@ -38,7 +38,6 @@ SerialPort.list((err, ports) => {
     // Iterate over all the serial ports, and look for an Arduino
     let comName_keypad = null;
     let comName_channel1 = null;
-    let comName_channel2 = null;
     let result = 0;
     ports.some((port) => {
       if (port.pnpId
@@ -48,73 +47,49 @@ SerialPort.list((err, ports) => {
             console.log('\t' + port.comName);
             console.log('\t\t' + port.pnpId);
             console.log('\t\t' + port.manufacturer);
-            /*result += 1;
-            if (result == 3) {
+            result += 1;
+            if (result == 2) {
               return true;
             }
-            */
-           return true;
           }
-       /* if (port.pnpId
-          && port.pnpId.match(/USB\\VID_2341\&PID_804E\&MI_00\\6\&56FCEDF\&0\&0000/)) { // Arduino MKR Channel 1 "hard coding"
+        if (port.pnpId
+          && port.pnpId.match(/USB\\VID_2341\&PID_0043\\75734323839351B00262/)) { // Arduino MKR Channel 1 "hard coding"
             comName_channel1 = port.comName;
             console.log('Found Arduino Channel 1');
             console.log('\t' + port.comName);
             console.log('\t\t' + port.pnpId);
             console.log('\t\t' + port.manufacturer);
             result += 1;
-            if (result == 3) {
+            if (result == 2) {
               return true;
             }
           }
-          /*
-        if (port.pnpId
-          && port.pnpId.match(/USB\\VID_2341\&PID_804E\&MI_00\\6\&56FCEDF\&0\&0000/)) { // Arduino Channel 2 "hard coding"
-            comName_channel2 = port.comName;
-            console.log('Found Arduino Channel 2');
-            console.log('\t' + port.comName);
-            console.log('\t\t' + port.pnpId);
-            console.log('\t\t' + port.manufacturer);
-            result += 1;
-            if (result == 3) {
-              return true;
-            }
-          }
-          */
         return false;
     });
-    /*
-    if (comName == null) {
-        comName = ports[0].comName;
-        console.warn('No Arduino found, selecting first COM port (' + comName + ')');
-    }
-    */
+
 
     // Open the port
     port_keypad = new SerialPort(comName_keypad, { baudRate: baudRate },
         (err) => {
-            if (err)
-                console.error(err);
+          if (err) {
+            console.error(err);
+          } else {
+            console.log("connected to keypad");
+          }
         });
-    
     // Attach a callback function to handle incomming data
     port_keypad.on('data', receiveKeypadSerial);
     console.log("Connected to Keypad port");
-/*
+
     port_channel1 = new SerialPort(comName_channel1, { baudRate: baudRate },
       (err) => {
-          if (err)
-              console.error(err);
+        if (err) {
+          console.error(err);
+        } else {
+          console.log("connected to channel 1");
+        }
       });
     port_channel1.on('data', receiveChannel1Serial);
-/*
-    port_channel2 = new SerialPort(comName_channel2, {buadRate: baudRate},
-      (err) => {
-        if (err)
-            console.error(err);
-    });
-    port_channel2.on('data', receiveChannel2Serial);
-    */
     
 });
 
@@ -150,7 +125,6 @@ class TextParser {
 
 const parserKeypad = new TextParser;
 const parserChannel1 = new TextParser;
-const parserChannel2 = new TextParser;
 
 const ResultCode = {
   SUCCESS: "0",
@@ -360,7 +334,7 @@ function changeVoucherIsUsed(userInput) {
       console.log("Error occurred in changing isUsed field of voucher " + userInput[2]);
       return writeToSerial([userInput[0], userInput[1], userInput[2], ResultCode.ERR_UNDEFINED]);
     } else {
-      return
+      return updateBalance([userInput[0], userInput[1], 0]);
     }
   });
 }
@@ -395,6 +369,7 @@ function writeToSerial(resultCode){
 
 function receiveChannel1Serial(dataBuf) {
   let str = dataBuf;
+  console.log("channel 1 buffer");
   console.log(str.length);
   console.log(str);
   str = str.toString('utf8');
@@ -406,25 +381,6 @@ function receiveChannel1Serial(dataBuf) {
           // If a complete line has been received,
           // insert it into the database
           splitChannelString([parserChannel1.message, 1]);
-      }
-  }
-}
-
-// ----------  Channel 2  ------------ //
-
-function receiveChannel2Serial(dataBuf) {
-  let str = dataBuf;
-  console.log(str.length);
-  console.log(str);
-  str = str.toString('utf8');
-  console.log(str);
-  // Loop over all characters
-  for (let i = 0; i < str.length; i++) {
-      // Parse the character
-      if (parserChannel2.parse(str[i])) {
-          // If a complete line has been received,
-          // insert it into the database
-          splitChannelString([parserChannel2.message, 1]);
       }
   }
 }
@@ -463,7 +419,7 @@ function divideChannelString(messageInfo) {
     console.log(currentData);
     if (currentData != 0) {
       let queryArray = [currentData, channelNum, houseNum];
-      con.query(sql, [queryArray], function (err, result, fields){
+      con.query(sql, queryArray, function (err, result, fields){
         if (err) {
           console.log("Error occurred in updating NG_userData table for channel 1, houseNum " + houseNum);
         } else {
@@ -479,23 +435,23 @@ function divideChannelString(messageInfo) {
  * @param {*} commandInfo [channelNum, houseNum, onOff]
  */
 function updateBalance(commandInfo) {
-  const sql = 'UPDATE `NG_UserData` SET `balance` = `credit` - `usage` WHERE  `channel` = (?) AND `buildingNum` = (?);';
+  const sql = 'UPDATE `NG_UserData` SET `balance` = `credit` - `usage` WHERE  `channel` = (?) AND `houseNum` = (?);';
   con.query(sql, [commandInfo[0], commandInfo[1]], function (err, result, fields){
     if (err) {
       console.log("Error occurred in updating balance for channel " + commandInfo[0] + " , houseNum " + commandInfo[1] + " with error " + err);
     } else {
       console.log(result);
       if (commandInfo[2] == 0) { // turning on
-        fireToCommand([userInput[0], userInput[1], 0]);
+        fireToCommand([commandInfo[0], commandInfo[1], 0]);
       } else if (commandInfo[2] == 1) { // turning off
-        selectBalance([userInput[0], userInput[1], 1]);
+        selectBalance([commandInfo[0], commandInfo[1], 1]);
       }
     }
   });
 }
 
 function selectBalance(channelInfo){
-  const sql = 'SELECT `balance` FROM `NG_UserData` WHERE  `channel` = (?) AND `buildingNum` = (?);';
+  const sql = 'SELECT `balance` FROM `NG_UserData` WHERE  `channel` = (?) AND `houseNum` = (?);';
   con.query(sql, [channelInfo[0], channelInfo[1]], function (err, result, fields){
     if (err) {
       console.log("Error occurred in updating balance for channel " + channelInfo[0] + " , houseNum " + channelInfo[1] + " with error " + err);
@@ -519,7 +475,7 @@ function fireToCommand(commandInfo) {
   let queryArray = [commandInfo[0], commandInfo[1], commandInfo[2], command, 0];
   con.query(sql, [queryArray], function (err, result, fields){
     if (err) {
-      console.log("Error occurred in firing to command table " + commandInfo);
+      console.log("Error occurred in firing to command table " + commandInfo+ " "  + err);
     } else {
       if (commandInfo[2] == 0) {
         writeToSerial([commandInfo[0], commandInfo[1], 0, ResultCode.SUCCESS]);

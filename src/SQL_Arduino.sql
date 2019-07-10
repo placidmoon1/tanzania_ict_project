@@ -32,8 +32,8 @@ CREATE TABLE IF NOT EXISTS `NG_UserData` (
   PRIMARY KEY (`id`),
   `channel` int(1) ZEROFILL NOT NULL,
   `houseNum` int(2) NOT NULL,
-  `credit` int(8) ZEROFILL NOT NULL DEFAULT 0,
-  `usage` int(8) ZEROFILL NOT NULL DEFAULT 0,
+  `credit` int(8)  NOT NULL DEFAULT 0,
+  `usage` int(8)  NOT NULL DEFAULT 0,
   `balance` int(8) NOT NULL 
 ) ENGINE = InnoDB 
   DEFAULT CHARSET = utf8mb4
@@ -78,7 +78,7 @@ CREATE TABLE IF NOT EXISTS `NG_RawCurrentData` (
   PRIMARY KEY (`id`),
   `date_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
   `channel` int(1) NOT NULL,
-  `raw_current_data` varchar(154) NOT NULL
+  `raw_current_data` varchar(155) NOT NULL
 ) ENGINE = InnoDB 
   DEFAULT CHARSET = utf8mb4
   DEFAULT COLLATE = utf8mb4_general_ci;

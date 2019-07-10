@@ -1,0 +1,3 @@
+COM7
+	USB\VID_2341&PID_0043\75734323839351B00262
+	Arduino LLC (www.arduino.cc)
