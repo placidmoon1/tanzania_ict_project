@@ -3,6 +3,7 @@
 const MySQL = require('mysql');
 
 const con = MySQL.createConnection({
+    multipleStatements: true,
     host: "localhost",
     port: "3306", 
     user: "root",
@@ -47,12 +48,14 @@ SerialPort.list((err, ports) => {
             console.log('\t' + port.comName);
             console.log('\t\t' + port.pnpId);
             console.log('\t\t' + port.manufacturer);
-            result += 1;
+            /*result += 1;
             if (result == 3) {
               return true;
             }
+            */
+           return true;
           }
-        if (port.pnpId
+       /* if (port.pnpId
           && port.pnpId.match(/USB\\VID_2341\&PID_804E\&MI_00\\6\&56FCEDF\&0\&0000/)) { // Arduino MKR Channel 1 "hard coding"
             comName_channel1 = port.comName;
             console.log('Found Arduino Channel 1');
@@ -64,6 +67,7 @@ SerialPort.list((err, ports) => {
               return true;
             }
           }
+          /*
         if (port.pnpId
           && port.pnpId.match(/USB\\VID_2341\&PID_804E\&MI_00\\6\&56FCEDF\&0\&0000/)) { // Arduino Channel 2 "hard coding"
             comName_channel2 = port.comName;
@@ -76,6 +80,7 @@ SerialPort.list((err, ports) => {
               return true;
             }
           }
+          */
         return false;
     });
     /*
@@ -95,20 +100,21 @@ SerialPort.list((err, ports) => {
     // Attach a callback function to handle incomming data
     port_keypad.on('data', receiveKeypadSerial);
     console.log("Connected to Keypad port");
-
+/*
     port_channel1 = new SerialPort(comName_channel1, { baudRate: baudRate },
       (err) => {
           if (err)
               console.error(err);
       });
     port_channel1.on('data', receiveChannel1Serial);
-
+/*
     port_channel2 = new SerialPort(comName_channel2, {buadRate: baudRate},
       (err) => {
         if (err)
             console.error(err);
     });
     port_channel2.on('data', receiveChannel2Serial);
+    */
     
 });
 
@@ -142,7 +148,9 @@ class TextParser {
     }
 }
 
-const parser = new TextParser;
+const parserKeypad = new TextParser;
+const parserChannel1 = new TextParser;
+const parserChannel2 = new TextParser;
 
 const ResultCode = {
   SUCCESS: "0",
@@ -155,7 +163,7 @@ const ResultCode = {
 /**
  * Entry function of Serial Events;
  * 1) Checks for Serial input of Arduino
- * 2) Parses input String using the "parser" object of the TextParser class
+ * 2) Parses input String using the "parserKeypad" object of the TextParser class
  * 3) If a complete line has been received (newline char received), 
  *    then change control to splitString
  * @param {byteArray (?)} dataBuf the received Buffer, 
@@ -169,11 +177,10 @@ function receiveKeypadSerial(dataBuf) {
     // Loop over all characters
     for (let i = 0; i < str.length; i++) {
         // Parse the character
-        if (parser.parse(str[i])) {
+        if (parserKeypad.parse(str[i])) {
             // If a complete line has been received,
             // insert it into the database
-            splitString(parser.message);
-
+            splitString(parserKeypad.message);
         }
     }
 }
@@ -191,6 +198,7 @@ function splitString(message){
   channelNum = parseInt(message.substr(1, 1));
   houseNum = parseInt(message.substr(2, 2));
   voucherNum = parseInt(message.substr(5, 10));
+  //if (Number.isNaN(channelNum) || Number.isNaN(houseNum) || Number.isNaN(houseNum) 
   console.log(channelNum);
   console.log(houseNum);
   console.log(voucherNum);
@@ -214,28 +222,30 @@ function checkVoucherValidity(userInput) {
   con.query(sql, [userInput[2]], function (err, result, fields) {
     if (err) {
       console.log("SELECT `isUsed` FROM `NG_Voucher` WHERE `voucherNum` = (?) failed");
-      return writeToSerial(ResultCode.ERR_UNDEFINED);
-    } 
-    while (true) {
-      if (typeof result !== undefined) {
-        break;
+      if (isNaN(userInput[0])){
+        return writeToSerial([0, 0, 0, ResultCode.ERR_INVALID_CHANNEL_OR_HOUSE_NUM]);
+      } else if (isNaN(userInput[1])) {
+        return writeToSerial([userInput[0], 0, 0, ResultCode.ERR_INVALID_CHANNEL_OR_HOUSE_NUM]);
+      } else if (isNaN(userInput[2])) {
+        return writeToSerial([userInput[0], userInput[1], 0, ResultCode.ERR_INVALID_CHANNEL_OR_HOUSE_NUM]);
+      } else {
+        return writeToSerial([userInput[0], userInput[1], userInput[2], ResultCode.ERR_INVALID_CHANNEL_OR_HOUSE_NUM]);
       }
-    }
+     
+    } 
     console.log(result);
     if (result.length == 0) {
       console.log("Voucher num doesn't exist");
-      return writeToSerial(ResultCode.ERR_INVALID_VOUCHER_NUM);
+      return writeToSerial([userInput[0], userInput[1], userInput[2], ResultCode.ERR_INVALID_VOUCHER_NUM]);
     }
     if (result[0].isUsed == 1) {
       console.log("Already Used");
-      return writeToSerial("2");   
+      return writeToSerial([userInput[0], userInput[1], userInput[2], ResultCode.ERR_USED_VOUCHER_NUM]);   
      } else { // if not used 
       getVoucherValue(userInput);
     }
   });
 }
-
-
 
 /**
  * Get the voucher value assoicated with the voucher number
@@ -250,7 +260,7 @@ function getVoucherValue(userInput){
   con.query(sql, [userInput[2]], function (err, result, fields){
     if (err) {
       console.log("Error occurred in selecting voucherValue field of voucher " + userInput[2]);
-      return writeToSerial(ResultCode.ERR_UNDEFINED);
+      return writeToSerial([userInput[0], userInput[1], userInput[2], ResultCode.ERR_UNDEFINED]);
     } else {
       userInputWithVV = [userInput[0], userInput[1], userInput[2], result[0].voucherValue];
       return getCorrespondingCredit(userInputWithVV);
@@ -272,7 +282,7 @@ function getCorrespondingCredit(userInput){
   con.query(sql, [userInput[3]], function (err, result, fields){
     if (err) {
       console.log("error occur in selecting credit equivalent of credit in NG_valueToKw " + userInput[3]);
-      return writeToSerial(ResultCode.ERR_UNDEFINED);
+      return writeToSerial([userInput[0], userInput[1], userInput[2], ResultCode.ERR_UNDEFINED]);
     } else {
       console.log(result);
       userInputWithVVAndCredit = [userInput[0], userInput[1], userInput[2], userInput[3], result[0].credit];
@@ -296,12 +306,12 @@ function updateUserData(userInput) {
   con.query(sql, [userInput[4], userInput[0], userInput[1]], function (err, result) {
     if (err) {
       console.log("Error occurred in updating value into NG_UserData");
-      return writeToSerial(ResultCode.ERR_UNDEFINED);
+      return writeToSerial([userInput[0], userInput[1], userInput[2], ResultCode.ERR_UNDEFINED]);
     } else {
       console.log(result);
       if (result.affectedRows == 0) {
         console.log("Error occurred in updating value into NG_updateUserData " + userInput);
-        return writeToSerial(ResultCode.ERR_INVALID_CHANNEL_OR_HOUSE_NUM);
+        return writeToSerial([userInput[0], userInput[1], userInput[2], ResultCode.ERR_INVALID_CHANNEL_OR_HOUSE_NUM]);
       }
       return insertValueIntoRawHistoryData(userInput);
     }
@@ -320,11 +330,12 @@ function updateUserData(userInput) {
  */
 function insertValueIntoRawHistoryData(userInput) {
   console.log("inserting " + userInput + " to NG_RawHistoryData");
-  const sql = 'INSERT INTO `NG_RawHistoryData` (`channel`, `houseNum`, `voucherNum`, `voucherValue`, `creditVal`) VALUES (?);';
-  con.query(sql, [userInput], function (err, result) {
+  const sql = 'INSERT INTO `NG_RawHistoryData` (`channel`, `houseNum`, `voucherNum`, `voucherValue`, `creditVal`, `processCode`) VALUES (?);';
+  let queryArray = [userInput[0], userInput[1], userInput[2], userInput[3], userInput[4], 0]
+  con.query(sql, [queryArray], function (err, result) {
       if (err) {
         console.log("Error occurred in inserting into rawhistorydata " + err);
-        return writeToSerial(ResultCode.ERR_UNDEFINED);
+        return writeToSerial([userInput[0], userInput[1], userInput[2], ResultCode.ERR_UNDEFINED]);
       } else {
         changeVoucherIsUsed(userInput);
       }
@@ -347,9 +358,9 @@ function changeVoucherIsUsed(userInput) {
   con.query(sql, [userInput[2]], function (err, result, fields){
     if (err) {
       console.log("Error occurred in changing isUsed field of voucher " + userInput[2]);
-      return writeToSerial(ResultCode.ERR_UNDEFINED);
+      return writeToSerial([userInput[0], userInput[1], userInput[2], ResultCode.ERR_UNDEFINED]);
     } else {
-      return writeToSerial(ResultCode.SUCCESS);
+      return
     }
   });
 }
@@ -359,13 +370,162 @@ function changeVoucherIsUsed(userInput) {
  * @param {ResultCode} resultCode One of the resultCodes defined in the resultCode enum
  */
 function writeToSerial(resultCode){
-  port.write(resultCode + "\n", 
+  if (resultCode[3] != ResultCode.SUCCESS) {
+    const sql = 'INSERT INTO `NG_RawHistoryData` (`channel`, `houseNum`, `voucherNum`, `voucherValue`, `creditVal`, `processCode`) VALUES (?);';
+    let queryArray = [resultCode[0], resultCode[1], resultCode[2], 0, 0, resultCode[3]];
+    con.query(sql, [queryArray], function (err, result, fields){
+      if (err) {
+        console.log("Error occurred in inserting into raw history data table " + resultCode[3] + " " + err);
+      }
+    });
+  } 
+  let resultCodeActual = resultCode[3];
+  console.log(resultCodeActual);
+  port_keypad.write(resultCodeActual + "\n", 
     (err) => {
       if (err) {
         return console.log("Error on write : ", err.message);
       }
-      console.log('message writen with resultCode: ' + resultCode);
+      console.log('message writen with resultCode: ' + resultCodeActual);
     }
   );
+}
+
+// ----------  Channel 1  ------------ //
+
+function receiveChannel1Serial(dataBuf) {
+  let str = dataBuf;
+  console.log(str.length);
+  console.log(str);
+  str = str.toString('utf8');
+  console.log(str);
+  // Loop over all characters
+  for (let i = 0; i < str.length; i++) {
+      // Parse the character
+      if (parserChannel1.parse(str[i])) {
+          // If a complete line has been received,
+          // insert it into the database
+          splitChannelString([parserChannel1.message, 1]);
+      }
+  }
+}
+
+// ----------  Channel 2  ------------ //
+
+function receiveChannel2Serial(dataBuf) {
+  let str = dataBuf;
+  console.log(str.length);
+  console.log(str);
+  str = str.toString('utf8');
+  console.log(str);
+  // Loop over all characters
+  for (let i = 0; i < str.length; i++) {
+      // Parse the character
+      if (parserChannel2.parse(str[i])) {
+          // If a complete line has been received,
+          // insert it into the database
+          splitChannelString([parserChannel2.message, 1]);
+      }
+  }
+}
+
+// --- Common Functions for Channel ------------ //
+
+function splitChannelString(messageInfo) {
+  let message = messageInfo[0];
+  let channelNum = messageInfo[1];
+  console.log("splitting string of channel " + message);
+  let validString = message.substr(0,4);
+  if (validString !== "data") {
+    console.log("not a valid sequence");
+  } else {
+    console.log("valid sequence");
+    splittedMessage = message.substr(5, 150); //current data, 30 sets of 'x.xx,'
+    const sql = 'INSERT INTO `NG_RawCurrentData` (`channel`, raw_current_data) VALUES (?, ?)';
+    con.query(sql, [channelNum, message], function (err, result, fields){
+      if (err) {
+        console.log("Error occurred in inserting into NG_rawcurrentdata table" + err);
+      } else {
+        console.log(result);
+        return divideChannelString([splittedMessage, channelNum]);
+      }
+    });
+  }
+}
+
+function divideChannelString(messageInfo) {
+  let message = messageInfo[0];
+  let channelNum = messageInfo[1];
+  console.log("dividing string of channel " + message);
+  const sql = 'UPDATE `NG_UserData` SET `usage` = `usage` + (?) WHERE `channel` = (?) AND `houseNum` = (?);';
+  for (let houseNum = 1; houseNum <= 22; houseNum++) {
+    let currentData = Math.floor(parseFloat(message.substr((houseNum -1)* 5, 4)) * 100); //assuming data is x.xx
+    console.log(currentData);
+    if (currentData != 0) {
+      let queryArray = [currentData, channelNum, houseNum];
+      con.query(sql, [queryArray], function (err, result, fields){
+        if (err) {
+          console.log("Error occurred in updating NG_userData table for channel 1, houseNum " + houseNum);
+        } else {
+          console.log(result);
+          return updateBalance([channelNum, houseNum, 1]);
+        }
+      });
+    }
+  }  
+}
+/**
+ * 
+ * @param {*} commandInfo [channelNum, houseNum, onOff]
+ */
+function updateBalance(commandInfo) {
+  const sql = 'UPDATE `NG_UserData` SET `balance` = `credit` - `usage` WHERE  `channel` = (?) AND `buildingNum` = (?);';
+  con.query(sql, [commandInfo[0], commandInfo[1]], function (err, result, fields){
+    if (err) {
+      console.log("Error occurred in updating balance for channel " + commandInfo[0] + " , houseNum " + commandInfo[1] + " with error " + err);
+    } else {
+      console.log(result);
+      if (commandInfo[2] == 0) { // turning on
+        fireToCommand([userInput[0], userInput[1], 0]);
+      } else if (commandInfo[2] == 1) { // turning off
+        selectBalance([userInput[0], userInput[1], 1]);
+      }
+    }
+  });
+}
+
+function selectBalance(channelInfo){
+  const sql = 'SELECT `balance` FROM `NG_UserData` WHERE  `channel` = (?) AND `buildingNum` = (?);';
+  con.query(sql, [channelInfo[0], channelInfo[1]], function (err, result, fields){
+    if (err) {
+      console.log("Error occurred in updating balance for channel " + channelInfo[0] + " , houseNum " + channelInfo[1] + " with error " + err);
+    } else {
+      console.log(result);
+      if (result[0].balance <= 0) {
+        return fireToCommand(channelInfo);
+      }
+    }
+  });
+}
+
+/**
+ * 
+ * @param {*} commandInfo [channelNum, houseNum, onOff]
+ */
+function fireToCommand(commandInfo) {
+  const sql = 'INSERT INTO `NG_CommandTable` (`channel`, `houseNum`, `onOff`, `command`, `sent`) VALUES (?);';
+  let command = "T-" + commandInfo[1] + "-" + commandInfo[2]; 
+  console.log(command);
+  let queryArray = [commandInfo[0], commandInfo[1], commandInfo[2], command, 0];
+  con.query(sql, [queryArray], function (err, result, fields){
+    if (err) {
+      console.log("Error occurred in firing to command table " + commandInfo);
+    } else {
+      if (commandInfo[2] == 0) {
+        writeToSerial([commandInfo[0], commandInfo[1], 0, ResultCode.SUCCESS]);
+      }
+      console.log("firing success " + command + " " + result);
+    }
+  });
 }
 

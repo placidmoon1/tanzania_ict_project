@@ -1,4 +1,5 @@
 const SerialPort = require('serialport');
+const fs = require("fs");
 
 SerialPort.list((err, ports) => {
   if (err)
@@ -19,6 +20,10 @@ SerialPort.list((err, ports) => {
       console.log('\t' + port.comName);
       console.log('\t\t' + port.pnpId);
       console.log('\t\t' + port.manufacturer);
+      let data = "" + port.comName + "\n\t" + port.pnpId + "\n\t" + port.manufacturer;
+      fs.writeFile("port_list.txt", data, (err) => {
+        if (err) console.log(err);
+      })
     }
       return false;
      

@@ -31,9 +31,10 @@ CREATE TABLE IF NOT EXISTS `NG_UserData` (
   `id` int(11) ZEROFILL AUTO_INCREMENT NOT NULL,
   PRIMARY KEY (`id`),
   `channel` int(1) ZEROFILL NOT NULL,
-  `houseNum` int(2) ZEROFILL NOT NULL,
+  `houseNum` int(2) NOT NULL,
   `credit` int(8) ZEROFILL NOT NULL DEFAULT 0,
-  `usage` int(8) ZEROFILL NOT NULL DEFAULT 0
+  `usage` int(8) ZEROFILL NOT NULL DEFAULT 0,
+  `balance` int(8) NOT NULL 
 ) ENGINE = InnoDB 
   DEFAULT CHARSET = utf8mb4
   DEFAULT COLLATE = utf8mb4_general_ci;
@@ -43,11 +44,12 @@ CREATE TABLE IF NOT EXISTS `NG_RawHistoryData` (
   `id` int(11) ZEROFILL AUTO_INCREMENT NOT NULL,
   PRIMARY KEY (`id`),
   `time_purchased` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  `channel` int(1) ZEROFILL NOT NULL,
-  `houseNum` int(2) UNSIGNED ZEROFILL NOT NULL,
-  `voucherNum` bigint(10) UNSIGNED ZEROFILL NOT NULL,
-  `voucherValue` int(6) UNSIGNED ZEROFILL NOT NULL,
-  `creditVal` int(6) ZEROFILL NOT NULL
+  `channel` int(1) ZEROFILL,
+  `houseNum` int(2) UNSIGNED ZEROFILL,
+  `voucherNum` bigint(10) UNSIGNED ZEROFILL,
+  `voucherValue` int(6) UNSIGNED ZEROFILL,
+  `creditVal` int(6) ZEROFILL,
+  `processCode` char(1) NOT NULL
 ) ENGINE = InnoDB 
   DEFAULT CHARSET = utf8mb4
   DEFAULT COLLATE = utf8mb4_general_ci;
@@ -76,29 +78,18 @@ CREATE TABLE IF NOT EXISTS `NG_RawCurrentData` (
   PRIMARY KEY (`id`),
   `date_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
   `channel` int(1) NOT NULL,
-  `raw_current_data` varchar(150) NOT NULL
+  `raw_current_data` varchar(154) NOT NULL
 ) ENGINE = InnoDB 
   DEFAULT CHARSET = utf8mb4
   DEFAULT COLLATE = utf8mb4_general_ci;
-
-CREATE TABLE IF NOT EXISTS `NG_RealTimeBucket` (
-  `id` int (11) ZEROFILL AUTO_INCREMENT NOT NULL,
-  PRIMARY KEY (`id`),
-  `date_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  `usage` int(8) UNSIGNED ZEROFILL NOT NULL,
-  `credit` int(8) UNSIGNED ZEROFILL NOT NULL,
-  `balance` int(8) ZEROFILL NOT NULL
-) ENGINE = InnoDB 
-  DEFAULT CHARSET = utf8mb4
-  DEFAULT COLLATE = utf8mb4_general_ci; 
 
 INSERT INTO `NG_valuetokw` (`value`, `credit`) VALUES (1000, 10);
 INSERT INTO `NG_valuetokw` (`value`, `credit`) VALUES (2000, 20);
 INSERT INTO `NG_valuetokw` (`value`, `credit`) VALUES (5000, 50);
 
-INSERT INTO `NG_deviceTable` (`deviceName`, `pnpId`) VALUES ("Arduino_Keypad", "1")
-INSERT INTO `NG_deviceTable` (`deviceName`, `pnpId`) VALUES ("Arduino_Channel1", "1")
-INSERT INTO `NG_deviceTable` (`deviceName`, `pnpId`) VALUES ("Arduino_Channel2", "1")
+INSERT INTO `NG_DeviceTable` (`deviceName`, `pnpId`) VALUES ("Arduino_Keypad", "1");
+INSERT INTO `NG_DeviceTable` (`deviceName`, `pnpId`) VALUES ("Arduino_Channel1", "1");
+INSERT INTO `NG_DeviceTable` (`deviceName`, `pnpId`) VALUES ("Arduino_Channel2", "1");
 
 DROP PROCEDURE IF EXISTS create_user_data; 
 DELIMITER $$
@@ -108,8 +99,8 @@ BEGIN
     DECLARE i INT;
     SET i = 1;
     WHILE i <= 22 DO
-        INSERT INTO `NG_UserData` (`channel`, `houseNum`,`credit`,`usage`) VALUES (1, i, 0, 0);
-        INSERT INTO `NG_UserData` (`channel`, `houseNum`,`credit`,`usage`) VALUES (2, i, 0, 0);
+        INSERT INTO `NG_UserData` (`channel`, `houseNum`,`credit`,`usage`, `balance`) VALUES (1, i, 0, 0, 0);
+        INSERT INTO `NG_UserData` (`channel`, `houseNum`,`credit`,`usage`, `balance`) VALUES (2, i, 0, 0, 0);
         SET i = i + 1;
     END WHILE;
 END $$

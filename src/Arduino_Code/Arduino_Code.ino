@@ -92,6 +92,7 @@ void loop(){
         break;
       } 
       if (forloopind == 9){
+        lcd.clear();
         received = '8';
       }
       delay(500);
