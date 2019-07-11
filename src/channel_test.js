@@ -141,13 +141,13 @@ function splitChannelString(messageInfo) {
         console.log("Error occurred in inserting into NG_rawcurrentdata table" + err);
       } else {
         console.log(result);
-        return divideChannelString([splittedMessage, channelNum]);
+        return updateUsage([splittedMessage, channelNum]);
       }
     });
   }
 }
 
-function divideChannelString(messageInfo) {
+function updateUsage(messageInfo) {
   let message = messageInfo[0];
   let channelNum = messageInfo[1];
   console.log("dividing string of channel " + message);

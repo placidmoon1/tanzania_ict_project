@@ -11,10 +11,7 @@ Hello, world
   - Keypad
   - LCD Shield 
   - 8 M-F Jumper wires 
-- Hardware Connection:
-  1. f
-  2. ff
-  3. xx
+
 ### Folder
 Create a folder in your drive to store the project. 
 
@@ -26,8 +23,8 @@ Create a folder in your drive to store the project.
 - Download and install `node.js` version 10.16.0 or higher fron the [official node.js site](https://nodejs.org/en/)
 - For this project, the server requires two modules:
   - First, open `cmd` (in Windows environment) and `cd` to the folder that you created
-  - Install the `MySQL` module through the `npm i mysql` command
-  - Install the `serialport` module through the `npm i serialport` command
+  - Install the `MySQL` module through the `npm i -g mysql` command
+  - Install the `serialport` module through the `npm i -g serialport` command
 - Also, depending on the MySQL server location, the following codeblock in the `NodeJS_data_logger.js` file in lines 5-12 needs to be changed
 
 ```javascript tomorrow
@@ -44,7 +41,25 @@ const con = MySQL.createConnection({
 ### PHP Server
 - Download and install WAMP server version 3.1.9 or higher from [sourceforge](https://sourceforge.net/projects/wampserver/)
 
-## Database Structure
+### Starting up the system
+On start: 
+1. Turn on the `WAMP` server. 
+2. Type `localhost` in your main browser and go to Tools > `phpmyadmin` 
+3. Login to `phpmyadmin` through the default username and password (`root`, [Nothing]) 
+4. **(Only on first start)** _Copy the `SQL_Arduino` code and paste it in the SQL tab and click go_
+5. Connect the `Arduino` with the computer usb port
+6. **(Only on first start)** _Upload the `Arduino_Code` file to the Arduino Mega using the `Arduino` IDE_
+7. Open the `cmd` and `cd` to the folder that you created
+8. **(Only on first start)** _Use the command `node list_all_ports.js` to list all devices connected to your Arduino._ 
+9. **\[Important!\] (Only on first start)** _Check the **pnpId** of the ports and adjust the `server_channel.js` code and `server_keypad.js` code appropriately_
+10. Use the command `node server_keypad.js` to turn on the **keypad** server
+11. Open another `cmd` prompt and `cd` to your folder.
+12. Use the command `node server_keypad.js` to turn on the `keypad` server
+
+Continuously: 
+1. User inputs a potentially valid input via Arduino keypad
+2. When the key `D` is clicked, user input would be blocked and the previous entered input would be parsed, queried appropriately, and a value would be returned. 
+3. The return value would be a `processCode`, which would be displayed in the Arduino LCD screen.
 
 
 ## Using the system
@@ -61,23 +76,6 @@ Example:
 - `channelNum` == 1
 - `buildingNum` == 11
 - `voucherNum` == 0123456789
-
-### Process of the system
-On start: 
-1. Turn on the `WAMP` server. 
-2. Type `localhost` in your main browser 
-3. Go to Tools > `phpmyadmin` 
-4. Login to `phpmyadmin` through the default username and password (`root`, [Nothing]) 
-5. **(Only on first start)** _Copy the `SQL_Arduino` code and paste it in the SQL tab and click go_
-6. Connect the `Arduino` with the computer usb port
-7. **(Only on first start)** _Upload the `Arduino_Code` file to the Arduino Mega using the `Arduino` IDE_
-7. Open the `cmd` and `cd` to the folder that you created
-8. Use the command `node NodeJS_data_logger` to turn on the `NodeJS` server
-
-Continuously: 
-1. User inputs a potentially valid input via Arduino keypad
-2. When the key `D` is clicked, user input would be blocked and the previous entered input would be parsed, queried appropriately, and a value would be returned. 
-3. The return value would be a `processCode`, which would be displayed in the Arduino LCD screen.
 
 ### LCD Display & `processCode`s
 - On start: `Turning on ...` for 2 seconds
