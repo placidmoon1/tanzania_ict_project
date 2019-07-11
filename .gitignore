@@ -1,2 +1,4 @@
 /src/node_modules
 /src/package-lock.json
+/src/out
+/src/port_list.txt
